@@ -1,0 +1,6 @@
+{
+  "name": "Land Title Mapper",
+  "description": "AI-powered survey visualizer for Philippine land titles. Parses technical descriptions (bearings and distances), calculates traverse closures, overlays plots on satellite maps, and exports KML files for Google Earth Pro.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
