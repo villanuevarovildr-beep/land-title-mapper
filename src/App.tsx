@@ -22,6 +22,55 @@ import { SurveyPlot, TraverseSegment, BearingQuadrant } from "./types";
 import { SAMPLE_TITLES, PHILIPPINES_PLAZAS, CADASTRAL_TIPS, PlazaPreset, SampleTitle } from "./data/surveyData";
 import { processSurveyPlot, getWgs84Coordinates, generateKmlContent, relativeMeterOffsetToWgs84 } from "./utils/surveyMath";
 
+const resolveAutoGeodeticCoordinates = (text: string) => {
+  const textLower = (text || "").toLowerCase();
+  
+  if (textLower.includes("antipolo") || textLower.includes("mambugan") || textLower.includes("mayamot") || textLower.includes("bagong nayon") || textLower.includes("inuman")) {
+    return {
+      lat: 14.5879,
+      lng: 121.1758,
+      name: "Antipolo Cathedral Plaza (Antipolo Cadastre BLLM No. 1)",
+      station: "Antipolo City Cadastre"
+    };
+  }
+  
+  if (textLower.includes("dinalupihan") || textLower.includes("bataan") || textLower.includes("san pedro, municipality of dinalupihan") || textLower.includes("san pedro, dinalupihan")) {
+    return {
+      lat: 14.8725,
+      lng: 120.4632,
+      name: "Dinalupihan Municipal Hall (BLLM No. 1 Plaza)",
+      station: "Dinalupihan Cadastre BLLM 1"
+    };
+  }
+
+  if (textLower.includes("quezon city") || textLower.includes("qc") || textLower.includes("diliman") || textLower.includes("barangay central")) {
+    return {
+      lat: 14.6515,
+      lng: 121.0496,
+      name: "Quezon City Hall / Memorial Circle",
+      station: "Quezon City Cadastre"
+    };
+  }
+
+  if (textLower.includes("manila") || textLower.includes("binondo") || textLower.includes("intramuros") || textLower.includes("malate") || textLower.includes("sampaloc") || textLower.includes("rizal monument")) {
+    return {
+      lat: 14.5826,
+      lng: 120.9787,
+      name: "Manila (Kilometer Zero / Rizal Monument)",
+      station: "Manila Cadastre"
+    };
+  }
+
+  // Under geodetic rules and instructions of this system, Morong Rizal Cadastre (geographic center / township center) is our core anchor.
+  // Latitude: 14.5100, Longitude: 121.2380
+  return {
+    lat: 14.5100,
+    lng: 121.2380,
+    name: "Morong Plaza (Morong Cadastre BLLM No. 1)",
+    station: "Morong, Rizal Cadastre"
+  };
+};
+
 export default function App() {
   // Parsing states
   const [inputText, setInputText] = useState<string>(SAMPLE_TITLES[0].text);
@@ -40,6 +89,7 @@ export default function App() {
   const [selectedPlazaName, setSelectedPlazaName] = useState<string>("[Blank] Custom Starting Ref Point");
   const [customStationName, setCustomStationName] = useState<string>("Morong, Rizal Cadastre");
   const [selectedPresetIndex, setSelectedPresetIndex] = useState<number>(0);
+  const [autoGeodetic, setAutoGeodetic] = useState<boolean>(true);
 
   // Offset tuning states (Manual offset compared to satellites)
   const [offsetX, setOffsetX] = useState<number>(0); // Easting offset in meters
@@ -60,6 +110,16 @@ export default function App() {
   useEffect(() => {
     handleLoadPreset(0);
   }, []);
+
+  // Automatic geodetic anchor point resolution based on parsed title text
+  useEffect(() => {
+    if (!autoGeodetic) return;
+    const resolved = resolveAutoGeodeticCoordinates(inputText);
+    setAnchorLat(resolved.lat);
+    setAnchorLng(resolved.lng);
+    setSelectedPlazaName(resolved.name);
+    setCustomStationName(resolved.station);
+  }, [inputText, autoGeodetic]);
 
   // Sync / Calculate plots whenever components change
   useEffect(() => {
@@ -168,6 +228,8 @@ export default function App() {
       setAnchorLat(position.lat);
       setAnchorLng(position.lng);
       setSelectedPlazaName("Custom Drag Position");
+      setCustomStationName("Custom Dragged Reference");
+      setAutoGeodetic(false);
     });
 
     monumentMarker.bindTooltip(
@@ -276,6 +338,7 @@ export default function App() {
   const handleSelectPlaza = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const name = e.target.value;
     setSelectedPlazaName(name);
+    setAutoGeodetic(false);
     const plaza = PHILIPPINES_PLAZAS.find(p => p.name === name);
     if (plaza) {
       setAnchorLat(plaza.lat);
@@ -568,12 +631,37 @@ export default function App() {
 
           {/* Reference Monument Anchorage Configurator */}
           <section className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
-            <h2 className="text-sm font-semibold text-slate-300 mb-2 flex items-center gap-2 font-mono">
-              <MapPin className="w-4 h-4 text-amber-500" />
-              REFERENCE POINT (BLLM ANCHORAGE)
-            </h2>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3.5 mb-4">
+              <h2 className="text-sm font-semibold text-slate-300 flex items-center gap-2 font-mono">
+                <MapPin className="w-4 h-4 text-amber-500" />
+                REFERENCE POINT (BLLM ANCHORAGE)
+              </h2>
+              
+              {/* Geodetic Auto Switch */}
+              <label className="inline-flex items-center gap-2 cursor-pointer bg-teal-500/10 border border-teal-500/30 px-3 py-1.5 rounded-xl hover:bg-teal-500/20 transition-all">
+                <input
+                  type="checkbox"
+                  checked={autoGeodetic}
+                  onChange={(e) => setAutoGeodetic(e.target.checked)}
+                  className="w-3.5 h-3.5 rounded border-slate-800 text-teal-400 focus:ring-teal-500/40 bg-slate-950 focus:ring-offset-0 focus:ring-2 accent-teal-400"
+                />
+                <span className="text-[10px] font-bold text-teal-300 uppercase tracking-wider font-mono select-none">
+                  {autoGeodetic ? "⚡ AUTO-GEODETIC ACTIVE" : "⚙️ MANUAL REFERENCE"}
+                </span>
+              </label>
+            </div>
+
             <p className="text-[11px] text-slate-400 mb-4 leading-relaxed">
-              Define the coordinate origin of your survey lot. Old deeds start from a reference monument (e.g. BLLM No. 1 Morong or Antipolo Cadastre). You can customize the name, select a preset, key in lat/lng, or click quick convenience helpers.
+              Define the coordinate origin of your survey lot.
+              {autoGeodetic ? (
+                <span className="text-teal-300 block mt-1 font-semibold">
+                  ⚡ <b>Geodetic Auto-Resolve Standard:</b> Coordinates automatically snuffed from deed text and centered to Morong (Lat: 14.5100, Lng: 121.2380) or nearest cadastre system.
+                </span>
+              ) : (
+                <span className="text-amber-400 block mt-1 font-semibold">
+                  ⚙️ <b>Manual Override Active:</b> Geodetic autosave disabled. You are manually anchoring coordinates.
+                </span>
+              )}
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -607,6 +695,7 @@ export default function App() {
                     if (selectedPlazaName !== "[Blank] Custom Starting Ref Point") {
                       setSelectedPlazaName("[Blank] Custom Starting Ref Point");
                     }
+                    setAutoGeodetic(false);
                   }}
                   placeholder="e.g. Morong Rizal Cadastre, BLLM 1"
                   className="w-full bg-slate-950 border border-slate-800 text-slate-200 rounded-xl px-3 py-2 text-xs outline-none focus:border-teal-500 transition font-mono"
@@ -627,6 +716,7 @@ export default function App() {
                     onChange={(e) => {
                       setAnchorLat(parseFloat(e.target.value) || 0);
                       setSelectedPlazaName("[Blank] Custom Starting Ref Point");
+                      setAutoGeodetic(false);
                     }}
                     className="w-full bg-slate-950 border border-slate-800 hover:border-slate-705 text-slate-200 rounded-xl px-3 py-2 text-xs font-mono outline-none focus:border-teal-500 transition"
                   />
@@ -642,6 +732,7 @@ export default function App() {
                     onChange={(e) => {
                       setAnchorLng(parseFloat(e.target.value) || 0);
                       setSelectedPlazaName("[Blank] Custom Starting Ref Point");
+                      setAutoGeodetic(false);
                     }}
                     className="w-full bg-slate-950 border border-slate-800 hover:border-slate-705 text-slate-200 rounded-xl px-3 py-2 text-xs font-mono outline-none focus:border-teal-500 transition"
                   />
@@ -664,6 +755,7 @@ export default function App() {
                     setCustomStationName("Morong, Rizal Cadastre");
                     setOffsetX(0);
                     setOffsetY(0);
+                    setAutoGeodetic(false);
                   }}
                   className={`px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition flex items-center gap-1.5 ${
                     Math.abs(anchorLat - 14.5100) < 0.001 && Math.abs(anchorLng - 121.2380) < 0.001
@@ -682,6 +774,7 @@ export default function App() {
                     setCustomStationName("Antipolo City Cadastre");
                     setOffsetX(0);
                     setOffsetY(0);
+                    setAutoGeodetic(false);
                   }}
                   className={`px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition flex items-center gap-1.5 ${
                     Math.abs(anchorLat - 14.5879) < 0.001 && Math.abs(anchorLng - 121.1758) < 0.001
@@ -700,6 +793,7 @@ export default function App() {
                     setCustomStationName("Dinalupihan Cadastre BLLM 1");
                     setOffsetX(0);
                     setOffsetY(0);
+                    setAutoGeodetic(false);
                   }}
                   className={`px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition flex items-center gap-1.5 ${
                     Math.abs(anchorLat - 14.8725) < 0.001 && Math.abs(anchorLng - 120.4632) < 0.001
@@ -718,6 +812,7 @@ export default function App() {
                     setCustomStationName("Quezon City Cadastre");
                     setOffsetX(0);
                     setOffsetY(0);
+                    setAutoGeodetic(false);
                   }}
                   className={`px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition flex items-center gap-1.5 ${
                     Math.abs(anchorLat - 14.6515) < 0.001 && Math.abs(anchorLng - 121.0496) < 0.001
